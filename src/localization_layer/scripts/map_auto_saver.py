@@ -15,7 +15,7 @@ class MapAutoSaver(Node):
     def __init__(self):
         super().__init__('map_auto_saver')
 
-        self.declare_parameter('map_save_dir', '/home/tkddn647/test/maps')
+        self.declare_parameter('map_save_dir', '/home/tkddn647/test/maps') # 파일 경로는 Jeston Nano의 절대 경로로 지정. 예시 : /home/username/maps
         self.declare_parameter('map_file_prefix', 'cartographer_map')
         self.declare_parameter('include_unfinished_submaps', True)
         self.declare_parameter('save_on_shutdown', True)
