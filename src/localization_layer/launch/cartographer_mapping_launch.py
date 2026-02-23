@@ -39,7 +39,7 @@ def generate_launch_description():
         ),
         DeclareLaunchArgument(
             'map_save_dir',
-            default_value='/home/tkddn647/test/maps',
+            default_value='/home/tkddn647/test/maps', # 파일 경로는 Jeston Nano의 절대 경로로 지정. 예시 : /home/username/maps
             description='Directory to store exported pbstream files',
         ),
         DeclareLaunchArgument(
