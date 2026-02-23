@@ -18,6 +18,8 @@
   <depend>tf2</depend>
   <depend>tf2_ros</depend>
   <depend>ros2launch</depend>
+  <depend>rclpy</depend>
+  <exec_depend>nav2_map_server</exec_depend>
 
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>

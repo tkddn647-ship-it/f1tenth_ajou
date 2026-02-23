@@ -9,10 +9,16 @@ find_package(ament_cmake REQUIRED)
 find_package(cartographer REQUIRED)
 find_package(cartographer_ros REQUIRED)
 
-ament_package()
-
 # Install launch files
 install(DIRECTORY launch DESTINATION share/${PROJECT_NAME})
 
 # Install config files
 install(DIRECTORY config DESTINATION share/${PROJECT_NAME})
+
+# Install helper scripts
+install(PROGRAMS
+  scripts/map_auto_saver.py
+  DESTINATION lib/${PROJECT_NAME}
+)
+
+ament_package()
