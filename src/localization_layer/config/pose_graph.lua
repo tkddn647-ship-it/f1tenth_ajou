@@ -1,16 +1,16 @@
 POSE_GRAPH = {
-  optimize_every_n_nodes = 90,
+  optimize_every_n_nodes = 120,
   constraint_builder = {
-    sampling_ratio = 0.3,
+    sampling_ratio = 0.2,
     max_constraint_distance = 15.,
-    min_score = 0.55,
-    global_localization_min_score = 0.6,
+    min_score = 0.62,
+    global_localization_min_score = 0.72,
     loop_closure_translation_weight = 1.1e4,
     loop_closure_rotation_weight = 1e5,
-    log_matches = true,
+    log_matches = false,
     fast_correlative_scan_matcher = {
-      linear_search_window = 7.,
-      angular_search_window = math.rad(30.),
+      linear_search_window = 4.,
+      angular_search_window = math.rad(15.),
       branch_and_bound_depth = 7,
     },
     ceres_scan_matcher = {

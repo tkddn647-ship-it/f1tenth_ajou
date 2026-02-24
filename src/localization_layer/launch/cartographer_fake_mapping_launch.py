@@ -16,6 +16,7 @@ def generate_launch_description():
     map_save_dir = LaunchConfiguration("map_save_dir")
     map_file_prefix = LaunchConfiguration("map_file_prefix")
     save_interval_sec = LaunchConfiguration("save_interval_sec")
+    world_type = LaunchConfiguration("world_type")
 
     return LaunchDescription([
         DeclareLaunchArgument(
@@ -33,6 +34,11 @@ def generate_launch_description():
             default_value="10.0",
             description="Periodic export interval in seconds",
         ),
+        DeclareLaunchArgument(
+            "world_type",
+            default_value="racing",
+            description="Fake world type: racing or room",
+        ),
         Node(
             package="tf_manager_cpp",
             executable="sensor_static_tf",
@@ -47,6 +53,7 @@ def generate_launch_description():
             parameters=[{
                 "rate_hz": 10.0,
                 "publish_static_tf": False,
+                "world_type": world_type,
             }],
         ),
         IncludeLaunchDescription(
