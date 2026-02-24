@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 
 import os
-import signal
 import subprocess
 import threading
 from datetime import datetime
@@ -25,6 +24,11 @@ class MapAutoSaver(Node):
         self.declare_parameter('ros_map_format', 'png')
         self.declare_parameter('ros_map_mode', 'trinary')
         self.declare_parameter('ros_map_timeout_sec', 20.0)
+        self.declare_parameter('write_state_timeout_sec', 15.0)
+        self.declare_parameter('service_wait_timeout_sec', 3.0)
+        self.declare_parameter('export_ros_map_on_shutdown', False)
+        self.declare_parameter('shutdown_write_state_timeout_sec', 4.0)
+        self.declare_parameter('shutdown_ros_map_timeout_sec', 2.0)
 
         self.map_save_dir = self.get_parameter('map_save_dir').get_parameter_value().string_value
         if not os.path.isabs(self.map_save_dir):
@@ -40,6 +44,21 @@ class MapAutoSaver(Node):
         self.ros_map_format = self.get_parameter('ros_map_format').get_parameter_value().string_value
         self.ros_map_mode = self.get_parameter('ros_map_mode').get_parameter_value().string_value
         self.ros_map_timeout_sec = self.get_parameter('ros_map_timeout_sec').get_parameter_value().double_value
+        self.write_state_timeout_sec = self.get_parameter(
+            'write_state_timeout_sec'
+        ).get_parameter_value().double_value
+        self.service_wait_timeout_sec = self.get_parameter(
+            'service_wait_timeout_sec'
+        ).get_parameter_value().double_value
+        self.export_ros_map_on_shutdown = self.get_parameter(
+            'export_ros_map_on_shutdown'
+        ).get_parameter_value().bool_value
+        self.shutdown_write_state_timeout_sec = self.get_parameter(
+            'shutdown_write_state_timeout_sec'
+        ).get_parameter_value().double_value
+        self.shutdown_ros_map_timeout_sec = self.get_parameter(
+            'shutdown_ros_map_timeout_sec'
+        ).get_parameter_value().double_value
 
         os.makedirs(self.map_save_dir, exist_ok=True)
         self.ros_log_dir = os.path.join(self.map_save_dir, '.roslog')
@@ -55,12 +74,18 @@ class MapAutoSaver(Node):
                 f'Periodic auto-save enabled: every {self.save_interval_sec:.1f}s -> {self.map_save_dir}'
             )
 
+    def _context_ok(self) -> bool:
+        try:
+            return rclpy.ok() and self.context.ok()
+        except Exception:
+            return False
+
     def _timestamped_stem(self) -> str:
         ts = datetime.now().strftime('%Y%m%d_%H%M%S')
         return os.path.join(self.map_save_dir, f'{self.map_file_prefix}_{ts}')
 
-    def _save_ros_map(self, map_filestem: str, reason: str) -> bool:
-        if not self.export_ros_map:
+    def _save_ros_map(self, map_filestem: str, reason: str, timeout_sec: float) -> bool:
+        if timeout_sec <= 0.0:
             return True
 
         cmd = [
@@ -80,7 +105,7 @@ class MapAutoSaver(Node):
             completed = subprocess.run(
                 cmd,
                 check=False,
-                timeout=self.ros_map_timeout_sec,
+                timeout=timeout_sec,
                 env=env,
                 capture_output=True,
                 text=True,
@@ -102,9 +127,44 @@ class MapAutoSaver(Node):
         )
         return False
 
-    def save_map(self, reason: str) -> bool:
+    def save_map(
+        self,
+        reason: str,
+        *,
+        service_wait_timeout_sec: float | None = None,
+        write_state_timeout_sec: float | None = None,
+        export_ros_map: bool | None = None,
+        ros_map_timeout_sec: float | None = None,
+    ) -> bool:
         with self._save_lock:
-            if not self.write_state_client.wait_for_service(timeout_sec=3.0):
+            if not self._context_ok():
+                return False
+
+            service_wait_timeout_sec = (
+                self.service_wait_timeout_sec
+                if service_wait_timeout_sec is None
+                else service_wait_timeout_sec
+            )
+            write_state_timeout_sec = (
+                self.write_state_timeout_sec
+                if write_state_timeout_sec is None
+                else write_state_timeout_sec
+            )
+            export_ros_map = self.export_ros_map if export_ros_map is None else export_ros_map
+            ros_map_timeout_sec = (
+                self.ros_map_timeout_sec
+                if ros_map_timeout_sec is None
+                else ros_map_timeout_sec
+            )
+
+            try:
+                service_ready = self.write_state_client.wait_for_service(
+                    timeout_sec=service_wait_timeout_sec
+                )
+            except Exception:
+                return False
+
+            if not service_ready:
                 self.get_logger().error('/write_state service is not available.')
                 return False
 
@@ -116,11 +176,12 @@ class MapAutoSaver(Node):
 
             self.get_logger().info(f'Saving map ({reason}) -> {output_path}')
             future = self.write_state_client.call_async(req)
-            rclpy.spin_until_future_complete(self, future, timeout_sec=15.0)
+            rclpy.spin_until_future_complete(self, future, timeout_sec=write_state_timeout_sec)
 
             if future.done() and future.result() is not None:
                 self.get_logger().info('Map saved successfully.')
-                self._save_ros_map(map_filestem, reason)
+                if export_ros_map:
+                    self._save_ros_map(map_filestem, reason, ros_map_timeout_sec)
                 return True
 
             self.get_logger().error('Map save failed or timed out.')
@@ -133,26 +194,28 @@ class MapAutoSaver(Node):
         if not self.save_on_shutdown or self._shutdown_save_done:
             return
         self._shutdown_save_done = True
-        self.save_map('shutdown')
+        if not self._context_ok():
+            return
+        self.save_map(
+            'shutdown',
+            service_wait_timeout_sec=min(1.5, self.service_wait_timeout_sec),
+            write_state_timeout_sec=self.shutdown_write_state_timeout_sec,
+            export_ros_map=self.export_ros_map_on_shutdown and self.export_ros_map,
+            ros_map_timeout_sec=self.shutdown_ros_map_timeout_sec,
+        )
 
 
 def main(args=None):
     rclpy.init(args=args)
     node = MapAutoSaver()
 
-    def _handle_signal(signum, _frame):
-        node.get_logger().info(f'Received signal {signum}, running final map save.')
-        node.save_once_on_shutdown()
-        rclpy.shutdown()
-
-    signal.signal(signal.SIGINT, _handle_signal)
-    signal.signal(signal.SIGTERM, _handle_signal)
-
     try:
         rclpy.spin(node)
+    except KeyboardInterrupt:
+        pass
     finally:
+        node.save_once_on_shutdown()
         if rclpy.ok():
-            node.save_once_on_shutdown()
             rclpy.shutdown()
         node.destroy_node()
 

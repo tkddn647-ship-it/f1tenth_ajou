@@ -10,7 +10,6 @@ public:
   {
     broadcaster_ =
       std::make_shared<tf2_ros::StaticTransformBroadcaster>(this);
-
     publish_lidar_tf();
     publish_imu_tf();
   }
@@ -26,9 +25,9 @@ private:
     tf.header.frame_id = "base_link";
     tf.child_frame_id = "laser";
 
-    tf.transform.translation.x = 1.0;
+    tf.transform.translation.x = 0.20;
     tf.transform.translation.y = 0.0;
-    tf.transform.translation.z = 1.0;
+    tf.transform.translation.z = 0.0;
 
     tf.transform.rotation.w = 1.0;
 
@@ -43,9 +42,9 @@ private:
     tf.header.frame_id = "base_link";
     tf.child_frame_id = "imu_link";
 
-    tf.transform.translation.x = 0.60;
+    tf.transform.translation.x = 0.10;
     tf.transform.translation.y = 0.00;
-    tf.transform.translation.z = 0.50;
+    tf.transform.translation.z = 0.00;
 
     tf.transform.rotation.w = 1.0;
 

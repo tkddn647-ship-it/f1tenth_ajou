@@ -116,6 +116,8 @@ def generate_launch_description():
             name='map_auto_saver',
             output='screen',
             condition=IfCondition(enable_auto_save),
+            sigterm_timeout='20',
+            sigkill_timeout='20',
             parameters=[{
                 'map_save_dir': map_save_dir,
                 'map_file_prefix': map_file_prefix,
@@ -129,6 +131,9 @@ def generate_launch_description():
                 'ros_map_format': ros_map_format,
                 'ros_map_mode': ros_map_mode,
                 'ros_map_timeout_sec': ParameterValue(ros_map_timeout_sec, value_type=float),
+                'export_ros_map_on_shutdown': False,
+                'shutdown_write_state_timeout_sec': 4.0,
+                'shutdown_ros_map_timeout_sec': 2.0,
             }],
         ),
     ])

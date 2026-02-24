@@ -18,6 +18,7 @@ install(DIRECTORY config DESTINATION share/${PROJECT_NAME})
 # Install helper scripts
 install(PROGRAMS
   scripts/map_auto_saver.py
+  scripts/fake_sensor_publisher.py
   DESTINATION lib/${PROJECT_NAME}
 )
 
