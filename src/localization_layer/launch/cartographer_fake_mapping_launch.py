@@ -31,7 +31,7 @@ def generate_launch_description():
         ),
         DeclareLaunchArgument(
             "save_interval_sec",
-            default_value="10.0",
+            default_value="20.0",
             description="Periodic export interval in seconds",
         ),
         DeclareLaunchArgument(
@@ -62,8 +62,13 @@ def generate_launch_description():
                 "map_save_dir": map_save_dir,
                 "map_file_prefix": map_file_prefix,
                 "save_interval_sec": save_interval_sec,
-                "save_on_shutdown": "false",
+                "save_on_shutdown": "true",
+                "export_ros_map_on_shutdown": "true",
                 "use_sim_time": "false",
+                "imu_topic": "/ebimu/imu",
+                "odom_topic": "/odom",
+                "scan_topic": "/scan",
+                "enable_sensor_bringup": "false",
             }.items(),
         ),
     ])

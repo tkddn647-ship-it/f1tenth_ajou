@@ -135,9 +135,10 @@ class MapAutoSaver(Node):
         write_state_timeout_sec: float | None = None,
         export_ros_map: bool | None = None,
         ros_map_timeout_sec: float | None = None,
+        allow_when_context_invalid: bool = False,
     ) -> bool:
         with self._save_lock:
-            if not self._context_ok():
+            if not allow_when_context_invalid and not self._context_ok():
                 return False
 
             service_wait_timeout_sec = (
@@ -188,7 +189,13 @@ class MapAutoSaver(Node):
             return False
 
     def _periodic_save_callback(self):
-        self.save_map('periodic')
+        # Run periodic save outside timer callback to avoid executor deadlock
+        # while waiting for /write_state service completion.
+        threading.Thread(
+            target=self.save_map,
+            args=('periodic',),
+            daemon=True,
+        ).start()
 
     def save_once_on_shutdown(self):
         if not self.save_on_shutdown or self._shutdown_save_done:
@@ -212,7 +219,20 @@ def main(args=None):
     try:
         rclpy.spin(node)
     except KeyboardInterrupt:
-        pass
+        # Try final save immediately on Ctrl+C before/while context teardown.
+        try:
+            node.get_logger().info('KeyboardInterrupt received. Attempting shutdown save...')
+        except Exception:
+            pass
+        node._shutdown_save_done = True
+        node.save_map(
+            'shutdown',
+            service_wait_timeout_sec=min(1.5, node.service_wait_timeout_sec),
+            write_state_timeout_sec=node.shutdown_write_state_timeout_sec,
+            export_ros_map=node.export_ros_map_on_shutdown and node.export_ros_map,
+            ros_map_timeout_sec=node.shutdown_ros_map_timeout_sec,
+            allow_when_context_invalid=True,
+        )
     finally:
         node.save_once_on_shutdown()
         if rclpy.ok():

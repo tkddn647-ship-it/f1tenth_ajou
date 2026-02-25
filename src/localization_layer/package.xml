@@ -21,6 +21,8 @@
   <depend>ros2launch</depend>
   <depend>rclpy</depend>
   <exec_depend>nav2_map_server</exec_depend>
+  <exec_depend>sensor_layer</exec_depend>
+  <exec_depend>tf_manager_cpp</exec_depend>
 
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>
