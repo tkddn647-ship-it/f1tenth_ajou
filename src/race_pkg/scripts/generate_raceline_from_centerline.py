@@ -1,3 +1,5 @@
+#센터라인 기반 레이싱 라인 생성 스크립트
+
 #!/usr/bin/env python3
 """
 centerline.csv + map.yaml → raceline.csv (맵 무관: 어떤 트랙이든 동일 파이프라인으로 이상적 레이싱 라인 추출).
