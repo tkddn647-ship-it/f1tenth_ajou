@@ -207,7 +207,7 @@ class MapAutoSaver(Node):
             'shutdown',
             service_wait_timeout_sec=min(1.5, self.service_wait_timeout_sec),
             write_state_timeout_sec=self.shutdown_write_state_timeout_sec,
-            export_ros_map=self.export_ros_map_on_shutdown and self.export_ros_map,
+            export_ros_map=self.export_ros_map_on_shutdown,
             ros_map_timeout_sec=self.shutdown_ros_map_timeout_sec,
         )
 
@@ -229,7 +229,7 @@ def main(args=None):
             'shutdown',
             service_wait_timeout_sec=min(1.5, node.service_wait_timeout_sec),
             write_state_timeout_sec=node.shutdown_write_state_timeout_sec,
-            export_ros_map=node.export_ros_map_on_shutdown and node.export_ros_map,
+            export_ros_map=node.export_ros_map_on_shutdown,
             ros_map_timeout_sec=node.shutdown_ros_map_timeout_sec,
             allow_when_context_invalid=True,
         )

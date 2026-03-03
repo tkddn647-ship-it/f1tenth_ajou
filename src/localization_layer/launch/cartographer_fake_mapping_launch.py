@@ -2,73 +2,18 @@ import os
 
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument
 from launch.actions import IncludeLaunchDescription
 from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch.substitutions import LaunchConfiguration
-from launch_ros.actions import Node
 
 
 def generate_launch_description():
-    pkg_dir = get_package_share_directory("localization_layer")
-    mapping_launch = os.path.join(pkg_dir, "launch", "cartographer_mapping_launch.py")
-
-    map_save_dir = LaunchConfiguration("map_save_dir")
-    map_file_prefix = LaunchConfiguration("map_file_prefix")
-    save_interval_sec = LaunchConfiguration("save_interval_sec")
-    world_type = LaunchConfiguration("world_type")
+    # Single source of truth: use sim_test/launch/sim_mapping.launch.py
+    # for fake simulation mapping.
+    sim_pkg_dir = get_package_share_directory("sim_test")
+    sim_mapping_launch = os.path.join(sim_pkg_dir, "launch", "sim_mapping.launch.py")
 
     return LaunchDescription([
-        DeclareLaunchArgument(
-            "map_save_dir",
-            default_value="/home/tkddn647/test/maps",
-            description="Directory to store exported map files",
-        ),
-        DeclareLaunchArgument(
-            "map_file_prefix",
-            default_value="fake_hwless_map",
-            description="Prefix for exported map files",
-        ),
-        DeclareLaunchArgument(
-            "save_interval_sec",
-            default_value="20.0",
-            description="Periodic export interval in seconds",
-        ),
-        DeclareLaunchArgument(
-            "world_type",
-            default_value="racing",
-            description="Fake world type: racing or room",
-        ),
-        Node(
-            package="tf_manager_cpp",
-            executable="sensor_static_tf",
-            name="sensor_static_tf_node",
-            output="screen",
-        ),
-        Node(
-            package="localization_layer",
-            executable="fake_sensor_publisher.py",
-            name="fake_sensor_publisher",
-            output="screen",
-            parameters=[{
-                "rate_hz": 10.0,
-                "publish_static_tf": False,
-                "world_type": world_type,
-            }],
-        ),
         IncludeLaunchDescription(
-            PythonLaunchDescriptionSource(mapping_launch),
-            launch_arguments={
-                "map_save_dir": map_save_dir,
-                "map_file_prefix": map_file_prefix,
-                "save_interval_sec": save_interval_sec,
-                "save_on_shutdown": "true",
-                "export_ros_map_on_shutdown": "true",
-                "use_sim_time": "false",
-                "imu_topic": "/ebimu/imu",
-                "odom_topic": "/odom",
-                "scan_topic": "/scan",
-                "enable_sensor_bringup": "false",
-            }.items(),
+            PythonLaunchDescriptionSource(sim_mapping_launch),
         ),
     ])

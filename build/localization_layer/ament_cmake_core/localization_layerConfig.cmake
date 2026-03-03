@@ -16,7 +16,7 @@ set(_localization_layer_CONFIG_INCLUDED TRUE)
 
 # output package information
 if(NOT localization_layer_FIND_QUIETLY)
-  message(STATUS "Found localization_layer: 0.1.0 (${localization_layer_DIR})")
+  message(STATUS "Found localization_layer: 0.0.1 (${localization_layer_DIR})")
 endif()
 
 # warn when using a deprecated package

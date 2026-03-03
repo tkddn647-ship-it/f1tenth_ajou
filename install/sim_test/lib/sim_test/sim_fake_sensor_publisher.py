@@ -1,0 +1,1 @@
+/home/tkddn647/test/src/sim_test/scripts/sim_fake_sensor_publisher.py

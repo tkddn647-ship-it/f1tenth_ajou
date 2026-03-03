@@ -29,7 +29,9 @@ class FakeSensorPublisher(Node):
         self.dt = 1.0 / self.rate_hz
         self.t = 0.0
 
-        self.scan_pub = self.create_publisher(LaserScan, "/scan", 10)
+        scan_qos = QoSProfile(depth=10)
+        scan_qos.reliability = ReliabilityPolicy.RELIABLE
+        self.scan_pub = self.create_publisher(LaserScan, "/scan", scan_qos)
         self.imu_pub = self.create_publisher(Imu, "/ebimu/imu", 10)
         self.odom_pub = self.create_publisher(Odometry, "/odom", 10)
 

@@ -53,10 +53,10 @@ RM = /usr/bin/cmake -E rm -f
 EQUALS = =
 
 # The top-level source directory on which CMake was run.
-CMAKE_SOURCE_DIR = /home/tkddn647/sensor_layer/src/sensor_layer
+CMAKE_SOURCE_DIR = /home/tkddn647/test/src/sensor_layer
 
 # The top-level build directory on which CMake was run.
-CMAKE_BINARY_DIR = /home/tkddn647/sensor_layer/build/sensor_layer
+CMAKE_BINARY_DIR = /home/tkddn647/test/build/sensor_layer
 
 # Utility rule file for sensor_layer_uninstall.
 
@@ -67,7 +67,7 @@ include CMakeFiles/sensor_layer_uninstall.dir/compiler_depend.make
 include CMakeFiles/sensor_layer_uninstall.dir/progress.make
 
 CMakeFiles/sensor_layer_uninstall:
-	/usr/bin/cmake -P /home/tkddn647/sensor_layer/build/sensor_layer/ament_cmake_uninstall_target/ament_cmake_uninstall_target.cmake
+	/usr/bin/cmake -P /home/tkddn647/test/build/sensor_layer/ament_cmake_uninstall_target/ament_cmake_uninstall_target.cmake
 
 sensor_layer_uninstall: CMakeFiles/sensor_layer_uninstall
 sensor_layer_uninstall: CMakeFiles/sensor_layer_uninstall.dir/build.make
@@ -82,6 +82,6 @@ CMakeFiles/sensor_layer_uninstall.dir/clean:
 .PHONY : CMakeFiles/sensor_layer_uninstall.dir/clean
 
 CMakeFiles/sensor_layer_uninstall.dir/depend:
-	cd /home/tkddn647/sensor_layer/build/sensor_layer && $(CMAKE_COMMAND) -E cmake_depends "Unix Makefiles" /home/tkddn647/sensor_layer/src/sensor_layer /home/tkddn647/sensor_layer/src/sensor_layer /home/tkddn647/sensor_layer/build/sensor_layer /home/tkddn647/sensor_layer/build/sensor_layer /home/tkddn647/sensor_layer/build/sensor_layer/CMakeFiles/sensor_layer_uninstall.dir/DependInfo.cmake --color=$(COLOR)
+	cd /home/tkddn647/test/build/sensor_layer && $(CMAKE_COMMAND) -E cmake_depends "Unix Makefiles" /home/tkddn647/test/src/sensor_layer /home/tkddn647/test/src/sensor_layer /home/tkddn647/test/build/sensor_layer /home/tkddn647/test/build/sensor_layer /home/tkddn647/test/build/sensor_layer/CMakeFiles/sensor_layer_uninstall.dir/DependInfo.cmake --color=$(COLOR)
 .PHONY : CMakeFiles/sensor_layer_uninstall.dir/depend
 

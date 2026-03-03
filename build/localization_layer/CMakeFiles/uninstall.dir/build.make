@@ -53,10 +53,10 @@ RM = /usr/bin/cmake -E rm -f
 EQUALS = =
 
 # The top-level source directory on which CMake was run.
-CMAKE_SOURCE_DIR = /home/tkddn647/sensor_layer/src/localization_layer
+CMAKE_SOURCE_DIR = /home/tkddn647/test/src/localization_layer
 
 # The top-level build directory on which CMake was run.
-CMAKE_BINARY_DIR = /home/tkddn647/sensor_layer/build/localization_layer
+CMAKE_BINARY_DIR = /home/tkddn647/test/build/localization_layer
 
 # Utility rule file for uninstall.
 
@@ -78,6 +78,6 @@ CMakeFiles/uninstall.dir/clean:
 .PHONY : CMakeFiles/uninstall.dir/clean
 
 CMakeFiles/uninstall.dir/depend:
-	cd /home/tkddn647/sensor_layer/build/localization_layer && $(CMAKE_COMMAND) -E cmake_depends "Unix Makefiles" /home/tkddn647/sensor_layer/src/localization_layer /home/tkddn647/sensor_layer/src/localization_layer /home/tkddn647/sensor_layer/build/localization_layer /home/tkddn647/sensor_layer/build/localization_layer /home/tkddn647/sensor_layer/build/localization_layer/CMakeFiles/uninstall.dir/DependInfo.cmake --color=$(COLOR)
+	cd /home/tkddn647/test/build/localization_layer && $(CMAKE_COMMAND) -E cmake_depends "Unix Makefiles" /home/tkddn647/test/src/localization_layer /home/tkddn647/test/src/localization_layer /home/tkddn647/test/build/localization_layer /home/tkddn647/test/build/localization_layer /home/tkddn647/test/build/localization_layer/CMakeFiles/uninstall.dir/DependInfo.cmake --color=$(COLOR)
 .PHONY : CMakeFiles/uninstall.dir/depend
 

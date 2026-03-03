@@ -34,6 +34,7 @@ def generate_launch_description():
     imu_topic = LaunchConfiguration('imu_topic')
     odom_topic = LaunchConfiguration('odom_topic')
     scan_topic = LaunchConfiguration('scan_topic')
+    configuration_basename = LaunchConfiguration('configuration_basename')
     enable_sensor_bringup = LaunchConfiguration('enable_sensor_bringup')
     ebimu_port = LaunchConfiguration('ebimu_port')
     ebimu_baud = LaunchConfiguration('ebimu_baud')
@@ -142,6 +143,11 @@ def generate_launch_description():
             description='LaserScan topic used by Cartographer',
         ),
         DeclareLaunchArgument(
+            'configuration_basename',
+            default_value='cartographer_2d_mapping_lidar_only.lua',
+            description='Cartographer Lua config basename',
+        ),
+        DeclareLaunchArgument(
             'enable_sensor_bringup',
             default_value='false',
             description='Include sensor_layer launch for IMU/LiDAR/TF when true',
@@ -220,7 +226,7 @@ def generate_launch_description():
             parameters=[{'use_sim_time': use_sim_time}],
             arguments=[
                 '-configuration_directory', config_dir,
-                '-configuration_basename', 'cartographer_2d_mapping.lua',
+                '-configuration_basename', configuration_basename,
             ],
             remappings=[
                 ('imu', imu_topic),

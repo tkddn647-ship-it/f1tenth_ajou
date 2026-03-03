@@ -8,19 +8,19 @@ from launch_ros.actions import Node
 
 def generate_launch_description():
 
-    port = LaunchConfiguration("port", default="/dev/ttyUSB0")
-    baud = LaunchConfiguration("baud", default="115200")
+    port = LaunchConfiguration("port")
+    baud = LaunchConfiguration("baud")
 
     return LaunchDescription([
 
         DeclareLaunchArgument(
             "port",
-            default_value=port,
+            default_value="/dev/ttyUSB0",
             description="EBIMU 시리얼 포트 (/dev/ttyUSB0 등)",
         ),
         DeclareLaunchArgument(
             "baud",
-            default_value=baud,
+            default_value="115200",
             description="EBIMU 시리얼 통신 속도 (115200 등)",
         ),
 

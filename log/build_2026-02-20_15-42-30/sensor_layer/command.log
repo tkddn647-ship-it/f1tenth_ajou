@@ -1,2 +1,0 @@
-Invoking command in '/home/tkddn647/sensor_layer/build/sensor_layer': /usr/bin/cmake /home/tkddn647/sensor_layer/src/sensor_layer -DCMAKE_INSTALL_PREFIX=/home/tkddn647/sensor_layer/install/sensor_layer
-Invoked command in '/home/tkddn647/sensor_layer/build/sensor_layer' returned '1': /usr/bin/cmake /home/tkddn647/sensor_layer/src/sensor_layer -DCMAKE_INSTALL_PREFIX=/home/tkddn647/sensor_layer/install/sensor_layer

@@ -2,24 +2,30 @@
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
   <name>localization_layer</name>
-  <version>0.1.0</version>
-  <description>Localization layer with wheel odometry, IMU, and EKF filtering for ROS2</description>
-
-  <maintainer email="todo@example.com">TODO</maintainer>
-  <license>Apache-2.0</license>
+  <version>0.0.1</version>
+  <description>Localization layer using Cartographer SLAM</description>
+  <maintainer email="tkddn647@example.com">tkddn647</maintainer>
+  <license>Apache License 2.0</license>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
 
-  <!-- EKF node -->
-  <exec_depend>robot_localization</exec_depend>
-
-  <!-- Cartographer mapping -->
-  <exec_depend>cartographer_ros</exec_depend>
-  <exec_depend>cartographer_ros_msgs</exec_depend>
+  <depend>cartographer</depend>
+  <depend>cartographer_ros</depend>
+  <depend>cartographer_ros_msgs</depend>
+  <depend>geometry_msgs</depend>
+  <depend>nav_msgs</depend>
+  <depend>sensor_msgs</depend>
+  <depend>tf2_msgs</depend>
+  <depend>tf2</depend>
+  <depend>tf2_ros</depend>
+  <depend>ros2launch</depend>
+  <depend>rclpy</depend>
   <exec_depend>nav2_map_server</exec_depend>
+  <exec_depend>sensor_layer</exec_depend>
+  <exec_depend>tf_manager_cpp</exec_depend>
 
-  <!-- launch -->
-  <exec_depend>ros2launch</exec_depend>
+  <test_depend>ament_lint_auto</test_depend>
+  <test_depend>ament_lint_common</test_depend>
 
   <export>
     <build_type>ament_cmake</build_type>

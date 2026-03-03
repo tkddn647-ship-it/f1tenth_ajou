@@ -1,0 +1,1 @@
+/home/tkddn647/test/build/sim_test/ament_cmake_environment_hooks/local_setup.bash
