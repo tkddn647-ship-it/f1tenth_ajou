@@ -27,6 +27,8 @@
     imu_yaw_bias_deg: 0.0
     imu_ang_vel_bias_deg: 0.0
     imu_ang_vel_noise_std_deg: 0.0
+    publish_odom: true
+    publish_odom_tf: true
 
     speed_modulation_amp: 0.0
     slip_event_rate: 0.0
@@ -36,11 +38,11 @@
 
     world_type: map
     map_yaml_path: /home/tkddn647/test/maps/example_map.yaml
-    centerline_csv_path: ""
-    centerline_auto_align_to_map: true
+    centerline_csv_path: /home/tkddn647/test/maps/example_waypoints.csv
+    centerline_auto_align_to_map: false
     centerline_offset_x_m: 0.0
     centerline_offset_y_m: 0.0
-    map_path_speed_mps: 0.35
+    map_path_speed_mps: 0.12
     map_path_points: 720
     map_use_pure_pursuit: false
     map_use_waypoint_heading: false
@@ -52,6 +54,8 @@
     pp_lookahead_gain: 0.03
     pp_max_yaw_rate_radps: 2.2
     pp_relock_distance_m: 12.0
+    use_threaded_scan_publisher: true
+    use_threaded_odom_publisher: true
     map_min_speed_mps: 0.2
     map_corner_preview_m: 2.0
     map_corner_slowdown_gain: 30.0

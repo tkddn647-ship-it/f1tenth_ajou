@@ -61,6 +61,7 @@ class FakeSensorPublisher(Node):
         self.declare_parameter("publish_odom_tf", True)
         self.declare_parameter("publish_imu", True)
         self.declare_parameter("publish_odom", True)
+        self.declare_parameter("odom_follow_ground_truth", False)
         self.declare_parameter("imu_yaw_bias_deg", 0.0)
         self.declare_parameter("imu_ang_vel_bias_deg", 0.0)
         self.declare_parameter("imu_ang_vel_noise_std_deg", 0.0)
@@ -161,6 +162,9 @@ class FakeSensorPublisher(Node):
         ).get_parameter_value().bool_value
         self.publish_imu = self.get_parameter("publish_imu").get_parameter_value().bool_value
         self.publish_odom = self.get_parameter("publish_odom").get_parameter_value().bool_value
+        self.odom_follow_ground_truth = self.get_parameter(
+            "odom_follow_ground_truth"
+        ).get_parameter_value().bool_value
         self.imu_yaw_bias = math.radians(
             self.get_parameter("imu_yaw_bias_deg").get_parameter_value().double_value
         )
@@ -212,6 +216,10 @@ class FakeSensorPublisher(Node):
         self.map_follow_waypoint_yaw = self.get_parameter(
             "map_follow_waypoint_yaw"
         ).get_parameter_value().bool_value
+        # Mapping stability mode: follow centerline by monotonic s-progress only.
+        # This removes controller relock/branch behavior from the pose source.
+        self.map_use_pure_pursuit = False
+        self.map_follow_waypoint_yaw = False
         self.map_waypoint_heading_gain = self.get_parameter(
             "map_waypoint_heading_gain"
         ).get_parameter_value().double_value
@@ -238,6 +246,19 @@ class FakeSensorPublisher(Node):
         self.use_threaded_odom_publisher = self.get_parameter(
             "use_threaded_odom_publisher"
         ).get_parameter_value().bool_value
+        # On this environment, ROS timers periodically stall and collapse
+        # effective scan/odom rates to ~1 Hz, which looks like TF/map teleport.
+        # Force dedicated publisher threads for deterministic cadence.
+        if not self.use_threaded_scan_publisher:
+            self.get_logger().warn(
+                "use_threaded_scan_publisher=false requested, but forcing true for stability."
+            )
+        if not self.use_threaded_odom_publisher:
+            self.get_logger().warn(
+                "use_threaded_odom_publisher=false requested, but forcing true for stability."
+            )
+        self.use_threaded_scan_publisher = True
+        self.use_threaded_odom_publisher = True
         self.state_dt = 1.0 / self.state_rate_hz
         self.scan_period_sec = 1.0 / self.lidar_rate_hz
         self.t = 0.0
@@ -246,6 +267,7 @@ class FakeSensorPublisher(Node):
         self.odom_y = None
         self.odom_yaw = None
         self.last_odom_pub_t = None
+        self.last_odom_pub_wall_ns = None
         self.gt_x = 0.0
         self.gt_y = 0.0
         self.gt_yaw = 0.0
@@ -270,9 +292,11 @@ class FakeSensorPublisher(Node):
         self.map_path_s = []
         self.map_path_total_length = 0.0
         self.map_path_progress = 0.0
+        self.map_path_is_loop = True
         self._prev_gt_yaw_for_rate = 0.0
         self._warned_no_map_path = False
         self._last_scan_perf_warn_t = -1e9
+        self._last_pose_jump_warn_t = -1e9
         self._scan_pub_count = 0
         self._scan_pub_elapsed_accum = 0.0
         self._timer_clock = Clock(clock_type=ClockType.STEADY_TIME)
@@ -308,7 +332,10 @@ class FakeSensorPublisher(Node):
                     "Vehicle motion will be held to avoid circular fallback."
                 )
 
-        scan_qos = QoSProfile(depth=1)
+        # Real-time scan streams should avoid middleware backpressure stalls.
+        # Keep a short queue and BEST_EFFORT delivery to prevent periodic
+        # multi-second publish gaps on constrained hosts.
+        scan_qos = QoSProfile(depth=10)
         scan_qos.reliability = ReliabilityPolicy.BEST_EFFORT
         scan_qos.durability = DurabilityPolicy.VOLATILE
         self.scan_pub = self.create_publisher(LaserScan, "/scan", scan_qos)
@@ -354,20 +381,12 @@ class FakeSensorPublisher(Node):
             clock=self._timer_clock,
         )
         self.scan_timer = None
-        if self.use_threaded_scan_publisher:
-            self._scan_thread = threading.Thread(
-                target=self._scan_publish_loop,
-                name="scan_publish_loop",
-                daemon=True,
-            )
-            self._scan_thread.start()
-        else:
-            self.scan_timer = self.create_timer(
-                self.scan_period_sec,
-                self._on_scan_timer,
-                callback_group=self._timer_cb_group,
-                clock=self._timer_clock,
-            )
+        self._scan_thread = threading.Thread(
+            target=self._scan_publish_loop,
+            name="scan_publish_loop",
+            daemon=True,
+        )
+        self._scan_thread.start()
         self.imu_timer = None
         self.odom_timer = None
         if self.publish_imu:
@@ -377,14 +396,7 @@ class FakeSensorPublisher(Node):
                 callback_group=self._timer_cb_group,
                 clock=self._timer_clock,
             )
-        if self.publish_odom and not self.use_threaded_odom_publisher:
-            self.odom_timer = self.create_timer(
-                1.0 / self.odom_rate_hz,
-                self._on_odom_timer,
-                callback_group=self._timer_cb_group,
-                clock=self._timer_clock,
-            )
-        if self.publish_odom and self.use_threaded_odom_publisher:
+        if self.publish_odom:
             self._odom_thread = threading.Thread(
                 target=self._odom_publish_loop,
                 name="odom_publish_loop",
@@ -411,6 +423,9 @@ class FakeSensorPublisher(Node):
             f"range_max={self.scan_range_max:.2f} m, "
             f"angle_min/max={math.degrees(self.scan_angle_min):.1f}/{math.degrees(self.scan_angle_max):.1f} deg, "
             f"increment={math.degrees(self.scan_angle_increment):.3f} deg"
+        )
+        self.get_logger().info(
+            "Control mode: centerline s-progress (pure_pursuit forced OFF, waypoint_yaw forced OFF)"
         )
 
     def _yaw_to_quat(self, yaw: float):
@@ -516,6 +531,7 @@ class FakeSensorPublisher(Node):
 
         points = []
         headings = []
+        s_values = []
         csv_mode = "xy"
         with open(csv_path, "r", encoding="utf-8") as f:
             for line in f:
@@ -533,10 +549,12 @@ class FakeSensorPublisher(Node):
                     continue
                 try:
                     if csv_mode == "sxy" and len(parts) >= 3:
+                        s_val = float(parts[0])
                         x = float(parts[1])
                         y = float(parts[2])
                         psi = float(parts[3]) if len(parts) >= 4 else float("nan")
                     else:
+                        s_val = float("nan")
                         x = float(parts[0])
                         y = float(parts[1])
                         psi = float("nan")
@@ -544,6 +562,17 @@ class FakeSensorPublisher(Node):
                     continue
                 points.append((x, y))
                 headings.append(psi)
+                s_values.append(s_val)
+
+        # Waypoint CSV can contain unsorted rows. If s_m exists, enforce
+        # monotonic ordering to prevent multi-meter path jumps.
+        if csv_mode == "sxy" and len(points) >= 3:
+            rows = list(zip(s_values, points, headings))
+            rows = [r for r in rows if not math.isnan(r[0])]
+            if len(rows) >= 3:
+                rows.sort(key=lambda r: r[0])
+                points = [r[1] for r in rows]
+                headings = [r[2] for r in rows]
 
         if len(points) < 3:
             self.get_logger().warn(
@@ -551,9 +580,20 @@ class FakeSensorPublisher(Node):
             )
             return
 
-        if math.hypot(points[0][0] - points[-1][0], points[0][1] - points[-1][1]) > 0.1:
-            points.append(points[0])
-            headings.append(headings[0] if headings else float("nan"))
+        close_gap = math.hypot(points[0][0] - points[-1][0], points[0][1] - points[-1][1])
+        # Only close the path when endpoints are already close. Forcing closure
+        # on open/unsorted centerlines creates multi-meter teleport jumps.
+        if close_gap <= 1.0:
+            if close_gap > 0.1:
+                points.append(points[0])
+                headings.append(headings[0] if headings else float("nan"))
+            self.map_path_is_loop = True
+        else:
+            self.map_path_is_loop = False
+            self.get_logger().warn(
+                f"Centerline appears open (endpoints gap={close_gap:.2f} m). "
+                "Treating path as non-loop to avoid wrap-around teleports."
+            )
 
         filtered = [points[0]]
         filtered_heading = [headings[0]]
@@ -687,9 +727,18 @@ class FakeSensorPublisher(Node):
             self.map_path_total_length = 0.0
             return
 
-        # Close path if needed.
-        if math.hypot(path[0][0] - path[-1][0], path[0][1] - path[-1][1]) > 0.1:
-            path.append(path[0])
+        # Close path only when endpoints are close enough.
+        close_gap = math.hypot(path[0][0] - path[-1][0], path[0][1] - path[-1][1])
+        if close_gap <= 1.0:
+            if close_gap > 0.1:
+                path.append(path[0])
+            self.map_path_is_loop = True
+        else:
+            self.map_path_is_loop = False
+            self.get_logger().warn(
+                f"Extracted path appears open (endpoints gap={close_gap:.2f} m). "
+                "Treating path as non-loop to avoid wrap-around teleports."
+            )
 
         filtered = [path[0]]
         s = [0.0]
@@ -718,7 +767,10 @@ class FakeSensorPublisher(Node):
     def _interpolate_map_path(self, s_query: float):
         if self.map_path_total_length <= 0.0 or len(self.map_path_xy) < 2:
             return None
-        s_mod = s_query % self.map_path_total_length
+        if self.map_path_is_loop:
+            s_mod = s_query % self.map_path_total_length
+        else:
+            s_mod = max(0.0, min(self.map_path_total_length, s_query))
         idx = 1
         while idx < len(self.map_path_s) and self.map_path_s[idx] < s_mod:
             idx += 1
@@ -744,7 +796,10 @@ class FakeSensorPublisher(Node):
             return None
         if any(math.isnan(h) for h in self.map_path_heading[: min(20, len(self.map_path_heading))]):
             return None
-        s_mod = s_query % self.map_path_total_length
+        if self.map_path_is_loop:
+            s_mod = s_query % self.map_path_total_length
+        else:
+            s_mod = max(0.0, min(self.map_path_total_length, s_query))
         idx = 1
         while idx < len(self.map_path_s) and self.map_path_s[idx] < s_mod:
             idx += 1
@@ -851,6 +906,20 @@ class FakeSensorPublisher(Node):
         self.gt_yaw_rate = yaw_rate
         self.gt_ax_body = 0.0
         self.gt_ay_body = v * yaw_rate
+
+        # Progress must advance even in pure-pursuit mode. Without this,
+        # the controller keeps chasing almost the same local segment and can
+        # oscillate/spin in place on curved tracks.
+        ds = max(0.0, v) * self.state_dt
+        if self.map_path_is_loop:
+            self.map_path_progress = (
+                self.map_path_progress + ds
+            ) % max(1e-6, self.map_path_total_length)
+        else:
+            self.map_path_progress = min(
+                max(0.0, self.map_path_total_length - 1e-3),
+                self.map_path_progress + ds,
+            )
 
     def _compute_map_path_speed(self, s_query: float):
         v_base = max(0.3, self.map_path_speed_mps)
@@ -1125,38 +1194,48 @@ class FakeSensorPublisher(Node):
     def _publish_odom_and_tf(self, x: float, y: float, yaw: float, v: float, yaw_rate: float):
         if self.odom_pub is None:
             return
-        if self.odom_x is None:
+        if self.odom_follow_ground_truth:
             self.odom_x = x
             self.odom_y = y
             self.odom_yaw = yaw
+            v_meas = v
+            yaw_rate_meas = yaw_rate
+        else:
+            if self.odom_x is None:
+                self.odom_x = x
+                self.odom_y = y
+                self.odom_yaw = yaw
+                self.last_odom_pub_t = self.t
+                self.last_odom_pub_wall_ns = time.monotonic_ns()
+
+            odom_dt = 1.0 / self.odom_rate_hz
+            now_wall_ns = time.monotonic_ns()
+            if self.last_odom_pub_wall_ns is not None:
+                odom_dt = max(1e-3, (now_wall_ns - self.last_odom_pub_wall_ns) * 1e-9)
+            self.last_odom_pub_wall_ns = now_wall_ns
             self.last_odom_pub_t = self.t
 
-        odom_dt = 1.0 / self.odom_rate_hz
-        if self.last_odom_pub_t is not None:
-            odom_dt = max(1e-4, self.t - self.last_odom_pub_t)
-        self.last_odom_pub_t = self.t
+            v_meas = v * (1.0 + self.odom_velocity_scale_error)
+            yaw_rate_meas = (
+                yaw_rate
+                + self.odom_yaw_rate_bias
+                + self.rng.gauss(0.0, self.odom_yaw_rate_noise_std)
+            )
 
-        v_meas = v * (1.0 + self.odom_velocity_scale_error)
-        yaw_rate_meas = (
-            yaw_rate
-            + self.odom_yaw_rate_bias
-            + self.rng.gauss(0.0, self.odom_yaw_rate_noise_std)
-        )
+            # Short slip events emulate tire slip at aggressive corner entries.
+            if self.slip_event_rate > 0.0 and self.t >= self._slip_until_t:
+                if self.rng.random() < self.slip_event_rate:
+                    self._slip_until_t = self.t + self.rng.uniform(
+                        self.slip_duration_min_sec, self.slip_duration_max_sec
+                    )
+            slip_scale = self.slip_scale if self.t < self._slip_until_t else 1.0
 
-        # Short slip events emulate tire slip at aggressive corner entries.
-        if self.slip_event_rate > 0.0 and self.t >= self._slip_until_t:
-            if self.rng.random() < self.slip_event_rate:
-                self._slip_until_t = self.t + self.rng.uniform(
-                    self.slip_duration_min_sec, self.slip_duration_max_sec
-                )
-        slip_scale = self.slip_scale if self.t < self._slip_until_t else 1.0
+            v_meas *= slip_scale
+            yaw_rate_meas *= (2.0 - slip_scale)
 
-        v_meas *= slip_scale
-        yaw_rate_meas *= (2.0 - slip_scale)
-
-        self.odom_yaw += yaw_rate_meas * odom_dt
-        self.odom_x += v_meas * math.cos(self.odom_yaw) * odom_dt
-        self.odom_y += v_meas * math.sin(self.odom_yaw) * odom_dt
+            self.odom_yaw += yaw_rate_meas * odom_dt
+            self.odom_x += v_meas * math.cos(self.odom_yaw) * odom_dt
+            self.odom_y += v_meas * math.sin(self.odom_yaw) * odom_dt
 
         now = self._next_header_stamp()
         qx, qy, qz, qw = self._yaw_to_quat(self.odom_yaw)
@@ -1189,6 +1268,10 @@ class FakeSensorPublisher(Node):
             self.tf_pub.publish(TFMessage(transforms=[tf]))
 
     def _update_ground_truth(self):
+        prev_x = self.gt_x
+        prev_y = self.gt_y
+        prev_yaw = self.gt_yaw
+
         # Use different trajectories by world type.
         if self.world_type == "room":
             radius = 2.5
@@ -1200,6 +1283,10 @@ class FakeSensorPublisher(Node):
                 else:
                     v = self._compute_map_path_speed(self.map_path_progress)
                     self.map_path_progress += v * self.state_dt
+                    if not self.map_path_is_loop:
+                        self.map_path_progress = min(
+                            self.map_path_progress, max(0.0, self.map_path_total_length - 1e-3)
+                        )
                     interp = self._interpolate_map_path(self.map_path_progress)
                     if interp is None:
                         x = self.map_cx + self.map_radius * math.cos(self.map_omega * self.t)
@@ -1249,6 +1336,36 @@ class FakeSensorPublisher(Node):
                 self.gt_yaw_rate = 0.0
                 self.gt_ax_body = 0.0
                 self.gt_ay_body = 0.0
+
+            # Guard against discontinuous centerline/path samples that can
+            # teleport TF and destabilize Cartographer. Skip guard in startup
+            # warm-up to allow initial pose/yaw alignment to settle.
+            if self.t > 2.0:
+                xy_jump = math.hypot(self.gt_x - prev_x, self.gt_y - prev_y)
+                yaw_jump = abs(
+                    math.atan2(
+                        math.sin(self.gt_yaw - prev_yaw),
+                        math.cos(self.gt_yaw - prev_yaw),
+                    )
+                )
+                if xy_jump > 0.35 or yaw_jump > math.radians(25.0):
+                    if (self.t - self._last_pose_jump_warn_t) > 1.0:
+                        self._last_pose_jump_warn_t = self.t
+                        self.get_logger().warn(
+                            f"Pose jump suppressed: dxy={xy_jump:.3f} m, dyaw={math.degrees(yaw_jump):.1f} deg"
+                        )
+                    # Relock progress to current vicinity so the next interpolation
+                    # does not keep hitting the same discontinuous segment.
+                    nearest_idx = self._closest_path_index(prev_x, prev_y)
+                    if nearest_idx < len(self.map_path_s):
+                        self.map_path_progress = self.map_path_s[nearest_idx]
+                    self.gt_x = prev_x
+                    self.gt_y = prev_y
+                    self.gt_yaw = prev_yaw
+                    self.gt_v = 0.0
+                    self.gt_yaw_rate = 0.0
+                    self.gt_ax_body = 0.0
+                    self.gt_ay_body = 0.0
             self.t += self.state_dt
             return
         else:
